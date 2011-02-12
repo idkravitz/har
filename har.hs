@@ -47,9 +47,7 @@ extract s = rle (nextSymbol s) s
                   xs = L.tail s
 
 main = do
-    args <- getArgs
-    -- nopts is file list
-    (opts, nopts) <- catch (archiverOpts args)
+    (opts, nopts) <- catch (getArgs >>= archiverOpts)
                            (\err -> do putStrLn $ ioeGetErrorString err
                                        exitWith $ ExitFailure 1)
     content <- L.readFile $ head nopts
