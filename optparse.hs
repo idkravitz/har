@@ -1,6 +1,7 @@
 module Optparse
 ( archiverOpts
-, Options(..))
+, Options(..)
+, Method(..))
 where
 
 import System.Environment
@@ -8,29 +9,37 @@ import System.Console.GetOpt
 import System.FilePath((<.>))
 import Data.Maybe(fromMaybe)
 
+data Method = RLE | Huffman deriving(Show, Eq)
+
 data Options = Options
     { optHelp     :: Bool
     , optCompress :: Bool
     , optExtract  :: Bool
     , optOutput   :: Maybe FilePath
+    , optMethod   :: Method
     } deriving(Show, Eq)
 
 defaultOptions = Options
     { optHelp      = False
     , optCompress  = False
     , optExtract   = False
+    , optMethod    = RLE
     , optOutput    = Nothing
     }
 
 options =
     [ Option ['h'] ["help"]
-        (NoArg (\o -> o { optHelp = True })) "print help message"
+        (NoArg  (\ o -> o { optHelp = True })) "print help message"
     , Option ['c'] ["compress"]
-        (NoArg (\o -> o { optCompress = True })) "use compression mode"
+        (NoArg  (\ o -> o { optCompress = True })) "use compression mode"
     , Option ['x'] ["extract"]
-        (NoArg (\o -> o { optExtract = True })) "use extraction mode"
+        (NoArg  (\ o -> o { optExtract = True })) "use extraction mode"
     , Option ['o'] ["output"]
-        (OptArg (\f o -> o { optOutput = f }) "FILE") "set output file"
+        (OptArg (\ f o -> o { optOutput = f }) "FILE") "set output file"
+    , Option ['r'] ["RLE"]
+        (NoArg  (\ o -> o { optMethod = RLE })) "use RLE algorithm (default)"
+    , Option ['H'] ["Huffman"]
+        (NoArg  (\ o -> o { optMethod = Huffman })) "use Huffman algorithm" 
     ]
 
 helpMsg = usageInfo header options

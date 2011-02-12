@@ -3,8 +3,8 @@
 HC = ghc
 HC_OPTS = --make -O2 -cpp $(EXTRA_HC_OPTS)
 
-SRC = optparse.hs har.hs  
-OBJS = optparse.o har.o
+SRC = huffman.hs archivecommon.hs rle.hs optparse.hs har.hs  
+OBJS = huffman.o archivecommon.o rle.o optparse.o har.o
 
 all: har
 
