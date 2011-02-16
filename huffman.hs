@@ -7,12 +7,15 @@ import Control.Monad
 import Control.Applicative
 import ArchiveCommon(Stream, Byte)
 import qualified Data.ByteString.Lazy as L
-import Data.Array.Diff
-import Data.Array.IArray
 import Data.Bits(setBit, testBit)
 import Data.Char(ord)
 import Data.Int(Int64)
 import qualified Data.Binary as Binary
+import System.IO.Unsafe(unsafePerformIO)
+import Debug.Trace
+import Data.Array
+import Data.Array.MArray
+import Data.Array.IO
 
 data Tree = Leaf Int Byte | Branch Int Tree Tree deriving(Show)
 data Bit = Zero | One deriving(Eq, Show)
@@ -35,10 +38,15 @@ instance Binary.Binary Tree where
 getCount (Leaf c _)     = c
 getCount (Branch c _ _) = c
 
-countBytes :: Stream -> DiffUArray Byte Int
-countBytes s = L.foldl (\ a b -> a // [(b, (a ! b) + 1)]) counts s
-    where counts :: DiffUArray Byte Int
-          counts = array (0, maxBound::Byte) (zip [0..255] $ cycle [0])
+{-# NOINLINE countBytes #-}
+countBytes :: Stream -> [(Byte, Int)]
+countBytes s = unsafePerformIO $ do
+    arr <- counts
+    forM_ (L.unpack s) (\ b -> do
+        e <- readArray arr b
+        writeArray arr b (e + 1))
+    getAssocs arr
+    where counts = newArray (0, 255) 0 :: IO (IOUArray Byte Int)
 
 getTree (t:ts) = work t [] ts
     where work x xs []                  = (x, xs)
@@ -46,9 +54,9 @@ getTree (t:ts) = work t [] ts
               | getCount y < getCount x = work y (x:xs) ys
               | otherwise               = work x (y:xs) ys
 
-type CodeBook = DiffArray Byte Bits
+type CodeBook = Array Byte Bits
 
-createCodebook :: Tree -> DiffArray Byte Bits
+createCodebook :: Tree -> CodeBook
 createCodebook t = array (0, 255) (work [] t)
     where
       work bs (Leaf _ x) = [(x, bs)]
@@ -66,7 +74,7 @@ bitsToStream bs = toByte h `L.cons` bitsToStream t
           toByte bs = foldl (\ a (b, i) -> if b == One then setBit a i else a)
                       0 (zip bs [7,6..0])
 
-encode :: DiffArray Byte Bits -> Stream -> Stream
+encode :: CodeBook -> Stream -> Stream
 encode cb = bitsToStream . encoded_bits cb
 
 streamToBits :: Stream -> Bits
@@ -92,7 +100,7 @@ buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
               (t1, ts1) = getTree ts0
           in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
-compress_huffman s = let t = buildTree . assocs . countBytes $ s
+compress_huffman s = let t = buildTree . countBytes $ s
                          cb = createCodebook t
                      in Binary.encode (t, L.length s, encode cb $ s)
 
