@@ -46,9 +46,7 @@ getCount (Branch c _ _) = c
 countBytes   :: Stream -> [(Byte, Int)]
 countBytes s = unsafePerformIO $ do
     arr <- counts
-    forM_ (L.unpack s) (\ b -> do
-        e <- readArray arr b
-        writeArray arr b (e + 1))
+    forM_ (L.unpack s) (\ b -> (+ 1) <$> readArray arr b >>= writeArray arr b)
     getAssocs arr
     where counts = newArray (0, 255) 0 :: IO (IOUArray Byte Int)
 
@@ -95,7 +93,7 @@ streamToBits s
     | L.null s  = []
     | otherwise = (getBit x) ++ streamToBits xs
     where (x, xs) = (L.head s, L.tail s)
-          getBit x = foldl (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
+          getBit x = foldl' (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
 
 -- extraction with specified tree
 decode :: Tree -> Stream -> Stream

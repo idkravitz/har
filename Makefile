@@ -2,7 +2,7 @@
 
 HC = ghc
 HC_OPTS = --make -O2 -cpp $(EXTRA_HC_OPTS)
-EXTRA_HC_OPTS = -fno-cse
+EXTRA_HC_OPTS = -fno-cse -prof -auto-all -caf-all
 
 SRC = huffman.hs archivecommon.hs rle.hs optparse.hs har.hs  
 OBJS = huffman.o archivecommon.o rle.o optparse.o har.o
