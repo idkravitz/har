@@ -70,11 +70,11 @@ createCodebook t = array (0, 255) (work [] t)
       work bs (Leaf _ x)       = [(x, bs)]
       work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
 
-encoded_bits    :: CodeBook -> Stream -> Bits
+encoded_bits      :: CodeBook -> Stream -> Bits
 encoded_bits cb s = concatMap (\b -> cb ! b) (L.unpack s)
 
 -- convert bit stream to byte stream
-bitsToStream :: Bits -> Stream
+bitsToStream    :: Bits -> Stream
 bitsToStream [] = L.empty
 bitsToStream bs = work 0 bs 7
     where work          :: Byte -> Bits ->Int -> Stream
@@ -85,7 +85,7 @@ bitsToStream bs = work 0 bs 7
             | otherwise = work (setBit a i) bs (i - 1)
 
 -- compression with specified codebook
-encode :: CodeBook -> Stream -> Stream
+encode    :: CodeBook -> Stream -> Stream
 encode cb = bitsToStream . encoded_bits cb
 
 -- convert byte stream to bit stream
@@ -93,7 +93,7 @@ streamToBits :: Stream -> Bits
 streamToBits s
     | L.null s  = []
     | otherwise = (getBit x) ++ streamToBits xs
-    where (x, xs) = (L.head s, L.tail s)
+    where (x, xs)  = (L.head s, L.tail s)
           getBit x = foldl' (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
 
 -- extraction with specified tree
@@ -106,25 +106,26 @@ decode t s = bitDecode t . streamToBits $ s
           bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
 
 -- create tree from statistics list (pairs of (byte, count))
+buildTree :: [(Byte, Int)] -> Tree
 buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
     where
       build [t] = t -- its leaf
-      build ts =
-          let (t0, ts0) = getTree ts  -- first smallest and rest that greater
-              (t1, ts1) = getTree ts0 -- second smallest and rest that greater
-          in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
+      build ts  =
+                let (t0, ts0) = getTree ts  -- first smallest and rest that greater
+                    (t1, ts1) = getTree ts0 -- second smallest and rest that greater
+                in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
-compress_huffman :: IO Stream -> IO Stream
+compress_huffman           :: IO Stream -> IO Stream
 compress_huffman makeInput = do
-    len <- (return $!). L.length =<< makeInput
-    t   <- (return $!). buildTree =<< countBytes  =<< makeInput
+    len  <- (return $!). L.length =<< makeInput
+    t    <- (return $!). buildTree =<< countBytes  =<< makeInput
     code <- return . encode (createCodebook t) =<< makeInput 
     return $ Binary.encode (t, len) `L.append` code
 
 deserialize :: Get (Tree, Int64, Stream)
 deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
 
-extract_huffman :: IO Stream -> IO Stream
+extract_huffman   :: IO Stream -> IO Stream
 extract_huffman s = do
     (t, l, bs) <- return . runGet deserialize =<< s
     return . L.take l . decode t $ bs
