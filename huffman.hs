@@ -4,7 +4,9 @@ module Huffman
 ) where
 
 import Control.Monad
+import Control.Monad.ST
 import Control.Applicative
+import Control.Exception.Base(evaluate)
 import ArchiveCommon(Stream, Byte)
 import qualified Data.ByteString.Lazy as L
 import Data.Bits(setBit, testBit)
@@ -113,9 +115,22 @@ buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
               (t1, ts1) = getTree ts0 -- second smallest and rest that greater
           in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
-compress_huffman s = let t = buildTree . countBytes $ s
+compress :: ST s Stream -> ST s Stream
+compress makeInput = do
+    len <- return . L.length =<< makeInput
+    t   <- return . buildTree . countBytes =<< makeInput
+    code <- return . encode (createCodebook t) =<< makeInput 
+    return . Binary.encode $ (t, len, code)
+
+compress_huffman :: IO Stream -> IO Stream
+compress_huffman s = stToIO (compress (unsafeIOToST s))
+{-
+let t = buildTree . countBytes $ s
                          cb = createCodebook t
                      in cb `seq` Binary.encode (t, L.length s, encode cb $ s)
-
-extract_huffman s = let (t, l, bs) = (Binary.decode s) :: (Tree, Int64, Stream)
-                    in L.take l . decode t $ bs
+-}
+extract_huffman :: IO Stream -> IO Stream
+extract_huffman s = do
+                    stm <- s
+                    let (t, l, bs) = Binary.decode stm :: (Tree, Int64, Stream)
+                    return . L.take l . decode t $ bs

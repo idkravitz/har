@@ -11,7 +11,8 @@ nextSymbol   :: Stream -> Byte
 nextSymbol s = (L.head s + 1) `rem` maxB
     where maxB = maxBound::Byte
 
-compress_rle s = rle (nextSymbol s) s $ Nothing
+compress_rle  :: IO Stream -> IO Stream 
+compress_rle s = return . (\s -> rle (nextSymbol s) s  Nothing) =<< s
     where
         maxB = maxBound :: Byte
         rle             :: Byte -> Stream -> Maybe Byte -> Stream
@@ -29,7 +30,8 @@ compress_rle s = rle (nextSymbol s) s $ Nothing
             where x  = L.head s
                   xs = L.tail s
 
-extract_rle s = rle (nextSymbol s) s
+extract_rle  :: IO Stream -> IO Stream 
+extract_rle s = return . (\s -> rle (nextSymbol s)  s) =<< s
     where rle p s
             | L.null s  = L.empty
             | p == x    = let counter = L.head xs
