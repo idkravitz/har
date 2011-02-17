@@ -4,21 +4,17 @@ module Huffman
 ) where
 
 import Control.Monad
-import Control.Monad.ST
 import Control.Applicative
-import Control.Exception.Base(evaluate)
-import ArchiveCommon(Stream, Byte)
 import qualified Data.ByteString.Lazy as L
 import Data.Bits(setBit, testBit)
-import Data.Char(ord)
 import Data.Int(Int64)
 import qualified Data.Binary as Binary
 import Data.Binary.Get
-import System.IO.Unsafe(unsafePerformIO)
 import Data.Array
 import Data.Array.MArray
 import Data.Array.IO
 import Data.List
+import ArchiveCommon(Stream, Byte)
 
 data Tree = Leaf Int Byte | Branch Int Tree Tree deriving(Show)
 data Bit = Zero | One deriving(Eq, Show)
