@@ -13,6 +13,7 @@ import Data.Bits(setBit, testBit)
 import Data.Char(ord)
 import Data.Int(Int64)
 import qualified Data.Binary as Binary
+import Data.Binary.Get
 import System.IO.Unsafe(unsafePerformIO)
 import Data.Array
 import Data.Array.MArray
@@ -45,8 +46,8 @@ getCount (Branch c _ _) = c
 -- DiffArray is too slow for whis task
 
 {-# NOINLINE countBytes #-}
-countBytes   :: Stream -> [(Byte, Int)]
-countBytes s = unsafePerformIO $ do
+countBytes   :: Stream -> ST s [(Byte, Int)]
+countBytes s = unsafeIOToST $ do
     arr <- counts
     forM_ (L.unpack s) (\ b -> (+ 1) <$> readArray arr b >>= writeArray arr b)
     getAssocs arr
@@ -70,9 +71,7 @@ createCodebook t = array (0, 255) (work [] t)
       work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
 
 encoded_bits    :: CodeBook -> Stream -> Bits
-encoded_bits cb s
-    | L.null s  = []
-    | otherwise = (cb ! L.head s) ++ encoded_bits cb (L.tail s)
+encoded_bits cb s = concatMap (\b -> cb ! b) (L.unpack s)
 
 -- convert bit stream to byte stream
 bitsToStream :: Bits -> Stream
@@ -87,7 +86,7 @@ bitsToStream bs = work 0 bs 7
 
 -- compression with specified codebook
 encode :: CodeBook -> Stream -> Stream
-encode cb s = bitsToStream $! encoded_bits cb s
+encode cb = bitsToStream . encoded_bits cb
 
 -- convert byte stream to bit stream
 streamToBits :: Stream -> Bits
@@ -117,20 +116,18 @@ buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
 
 compress :: ST s Stream -> ST s Stream
 compress makeInput = do
-    len <- return . L.length =<< makeInput
-    t   <- return . buildTree . countBytes =<< makeInput
+    len <- (return $!). L.length =<< makeInput
+    t   <- (return $!). buildTree =<< countBytes  =<< makeInput
     code <- return . encode (createCodebook t) =<< makeInput 
-    return . Binary.encode $ (t, len, code)
+    return $ Binary.encode (t, len) `L.append` code
 
 compress_huffman :: IO Stream -> IO Stream
 compress_huffman s = stToIO (compress (unsafeIOToST s))
-{-
-let t = buildTree . countBytes $ s
-                         cb = createCodebook t
-                     in cb `seq` Binary.encode (t, L.length s, encode cb $ s)
--}
+
+deserialize :: Get (Tree, Int64, Stream)
+deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
+
 extract_huffman :: IO Stream -> IO Stream
 extract_huffman s = do
-                    stm <- s
-                    let (t, l, bs) = Binary.decode stm :: (Tree, Int64, Stream)
-                    return . L.take l . decode t $ bs
+    (t, l, bs) <- return . runGet deserialize =<< s
+    return . L.take l . decode t $ bs
