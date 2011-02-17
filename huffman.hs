@@ -46,8 +46,8 @@ getCount (Branch c _ _) = c
 -- DiffArray is too slow for whis task
 
 {-# NOINLINE countBytes #-}
-countBytes   :: Stream -> ST s [(Byte, Int)]
-countBytes s = unsafeIOToST $ do
+countBytes   :: Stream -> IO [(Byte, Int)]
+countBytes s = do
     arr <- counts
     forM_ (L.unpack s) (\ b -> (+ 1) <$> readArray arr b >>= writeArray arr b)
     getAssocs arr
@@ -114,15 +114,12 @@ buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
               (t1, ts1) = getTree ts0 -- second smallest and rest that greater
           in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
-compress :: ST s Stream -> ST s Stream
-compress makeInput = do
+compress_huffman :: IO Stream -> IO Stream
+compress_huffman makeInput = do
     len <- (return $!). L.length =<< makeInput
     t   <- (return $!). buildTree =<< countBytes  =<< makeInput
     code <- return . encode (createCodebook t) =<< makeInput 
     return $ Binary.encode (t, len) `L.append` code
-
-compress_huffman :: IO Stream -> IO Stream
-compress_huffman s = stToIO (compress (unsafeIOToST s))
 
 deserialize :: Get (Tree, Int64, Stream)
 deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
