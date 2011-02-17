@@ -41,7 +41,6 @@ getCount (Branch c _ _) = c
 -- making a time complicity O(n) with small const
 -- DiffArray is too slow for whis task
 
-{-# NOINLINE countBytes #-}
 countBytes   :: Stream -> IO [(Byte, Int)]
 countBytes s = do
     arr <- counts
@@ -62,9 +61,8 @@ type CodeBook = Array Byte Bits
 
 createCodebook   :: Tree -> CodeBook
 createCodebook t = array (0, 255) (work [] t)
-    where
-      work bs (Leaf _ x)       = [(x, bs)]
-      work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
+    where work bs (Leaf _ x)       = [(x, bs)]
+          work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
 
 encoded_bits      :: CodeBook -> Stream -> Bits
 encoded_bits cb s = concatMap (\b -> cb ! b) (L.unpack s)
@@ -104,12 +102,11 @@ decode t s = bitDecode t . streamToBits $ s
 -- create tree from statistics list (pairs of (byte, count))
 buildTree :: [(Byte, Int)] -> Tree
 buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
-    where
-      build [t] = t -- its leaf
-      build ts  =
-                let (t0, ts0) = getTree ts  -- first smallest and rest that greater
-                    (t1, ts1) = getTree ts0 -- second smallest and rest that greater
-                in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
+    where build [t] = t -- its leaf
+          build ts  =
+                    let (t0, ts0) = getTree ts  -- first smallest and rest that greater
+                        (t1, ts1) = getTree ts0 -- second smallest and rest that greater
+                    in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
 compress_huffman           :: IO Stream -> IO Stream
 compress_huffman makeInput = do
