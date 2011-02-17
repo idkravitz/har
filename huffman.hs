@@ -33,6 +33,7 @@ instance Binary.Binary Tree where
              case t of
                   0 -> liftM2 Leaf Binary.get Binary.get
                   1 -> liftM3 Branch Binary.get Binary.get Binary.get
+                  _ -> error "Tree is corrupted"
 
 getCount (Leaf c _)     = c
 getCount (Branch c _ _) = c
