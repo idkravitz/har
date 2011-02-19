@@ -1,12 +1,14 @@
 Name:          har
 Version:       0.1
+Category:      archiver
 Description:   simple, academic haskell archiver
+Synopsis:      simple, academic haskell archiver
 License:       GPL-3
 License-file:  LICENSE
 Author:        Dmitry S. Kravtsov
 Maintainer:    idkravitz@gmail.com
 Build-Type:    Simple
-Cabal-Version: >=1.2
+Cabal-Version: >=1.4
 Stability:     alpha
 Homepage:      http://github.com/kravitz/har
 
@@ -15,10 +17,10 @@ Library
 
 Executable har
     Main-is:       har.hs
-    Build-Depends: bytestring > 0.9,
-                   base       > 4.0,
-                   array,
-                   ghc-binary,
-                   filepath
+    Build-Depends: bytestring >= 0.9,
+                   base       >= 4.0 && < 9999,
+                   array      >= 0.3,
+                   ghc-binary >= 0.5,
+                   filepath   >= 1.1
     Other-modules: ArchiveCommon RLE Huffman Optparse
 
