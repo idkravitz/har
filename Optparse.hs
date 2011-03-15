@@ -46,7 +46,7 @@ helpMsg = usageInfo header options
     where header = "Usage: har [OPTION...] file"
 
 fixOutput (opts, nopts) = (opts { optOutput = Just . outputFileName $ optOutput opts }, nopts)
-    where outputFileName Nothing = (head nopts) <.> ".har"
+    where outputFileName Nothing = head nopts <.> ".har"
           outputFileName (Just f) = f
 
 archiverOpts :: [String] -> IO (Options, [String])

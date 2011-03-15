@@ -1,6 +1,6 @@
 module Huffman
-( compress_huffman
-, extract_huffman
+( compressHuffman
+, extractHuffman
 ) where
 
 import Control.Monad
@@ -65,8 +65,8 @@ createCodebook t = array (0, 255) (work [] t)
     where work bs (Leaf _ x)       = [(x, bs)]
           work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
 
-encoded_bits      :: CodeBook -> Stream -> Bits
-encoded_bits cb s = concatMap (\b -> cb ! b) (L.unpack s)
+encodedBits      :: CodeBook -> Stream -> Bits
+encodedBits cb s = concatMap (\b -> cb ! b) (L.unpack s)
 
 -- convert bit stream to byte stream
 bitsToStream    :: Bits -> Stream
@@ -75,19 +75,19 @@ bitsToStream bs = work 0 bs 7
     where work          :: Byte -> Bits ->Int -> Stream
           work a [] _   = L.singleton a
           work a (b:bs) i
-            | i == 0    = (if b == One then setBit a i else a) `L.cons` (work 0 bs 7)
+            | i == 0    = (if b == One then setBit a i else a) `L.cons` work 0 bs 7
             | b == Zero = work a bs (i - 1)
             | otherwise = work (setBit a i) bs (i - 1)
 
 -- compression with specified codebook
 encode    :: CodeBook -> Stream -> Stream
-encode cb = bitsToStream . encoded_bits cb
+encode cb = bitsToStream . encodedBits cb
 
 -- convert byte stream to bit stream
 streamToBits :: Stream -> Bits
 streamToBits s
     | L.null s  = []
-    | otherwise = (getBit x) ++ streamToBits xs
+    | otherwise = getBit x ++ streamToBits xs
     where (x, xs)  = (L.head s, L.tail s)
           getBit x = foldl' (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
 
@@ -109,8 +109,8 @@ buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
                         (t1, ts1) = getTree ts0 -- second smallest and rest that greater
                     in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
-compress_huffman           :: IO Stream -> IO Stream
-compress_huffman makeInput = do
+compressHuffman           :: IO Stream -> IO Stream
+compressHuffman makeInput = do
     len  <- (return $!). L.length =<< makeInput
     t    <- (return $!). buildTree =<< countBytes  =<< makeInput
     code <- return . encode (createCodebook t) =<< makeInput 
@@ -119,7 +119,7 @@ compress_huffman makeInput = do
 deserialize :: Get (Tree, Int64, Stream)
 deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
 
-extract_huffman   :: IO Stream -> IO Stream
-extract_huffman s = do
+extractHuffman   :: IO Stream -> IO Stream
+extractHuffman s = do
     (t, l, bs) <- return . runGet deserialize =<< s
     return . L.take l . decode t $ bs
