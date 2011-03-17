@@ -9,6 +9,7 @@ import RLE(compressRLE, extractRLE)
 import Huffman(compressHuffman, extractHuffman)
 import ArchiveCommon(Stream, Byte)
 import qualified Data.ByteString.Lazy as L
+import qualified Data.Binary as Binary
 
 compress         :: Method -> IO Stream -> IO Stream
 extract          :: Method -> IO Stream -> IO Stream
@@ -18,7 +19,14 @@ extract  RLE     = extractRLE
 extract  Huffman = extractHuffman
 
 produceCompression :: String -> [String] -> Method -> IO ()
-produceCompression output inputs method = return()
+produceCompression output inputs method = do
+  out <- openFile output WriteMode
+  forM_ inputs \ input -> do
+    inp <- openFile input ReadMode
+    size <- hFileSize inp
+    L.hPut out . Binary.put $ input
+
+  
 
 produceExtraction :: String -> Method -> IO ()
 produceExtraction input method = return ()
