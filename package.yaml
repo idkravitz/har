@@ -39,13 +39,14 @@ executables:
     dependencies:
     - har
 
-#tests:
-#  hdig-test:
-#    main:                Spec.hs
-#    source-dirs:         test
-#    ghc-options:
-#    - -threaded
-#    - -rtsopts
-#    - -with-rtsopts=-N
-#    dependencies:
-#    - har
+tests:
+  har-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - har
+    - hspec
