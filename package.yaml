@@ -29,7 +29,7 @@ library:
   source-dirs: src
 
 executables:
-  hdig-exe:
+  har-exe:
     main:                har.hs
     source-dirs:         app
     ghc-options:
