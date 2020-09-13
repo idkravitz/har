@@ -1,6 +1,16 @@
-module Compression.Base(Compressor(..)) where
+module Compression.Base
+( CompressionAlgorithm(..)
+, Stream
+, Byte
+) where
 
-import ArchiveCommon(Stream)
+import Data.Word(Word8)
+import Data.ByteString.Lazy(ByteString)
 
-class Compressor algo where
-  compress, extract :: algo -> IO Stream -> IO Stream
+type Stream = ByteString
+type Byte   = Word8
+
+data CompressionAlgorithm = CompAlg {
+  caCompress :: IO Stream -> IO Stream,
+  caExtract  :: IO Stream -> IO Stream
+}

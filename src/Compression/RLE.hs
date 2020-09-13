@@ -1,26 +1,25 @@
 module Compression.RLE
 (
-CompressionRLE(..)
+  rleAlg
 ) where
 
-import ArchiveCommon(Stream, Byte)
-import qualified Data.ByteString.Lazy as L
 import Compression.Base
+import qualified Data.ByteString.Lazy as L
 
-data CompressionRLE = CompressionRLE
-  deriving (Show)
+rleAlg :: CompressionAlgorithm
+rleAlg = CompAlg {
+  caCompress = compressRLE,
+  caExtract  = extractRLE
+}
 
-instance Compressor CompressionRLE where
-  compress _ = compressRLE
-  extract _ = extractRLE
 
-
+-- TODO: What the fuck is this shit?!
 nextSymbol   :: Stream -> Byte
 nextSymbol s = (L.head s + 1) `rem` maxB
     where maxB = maxBound::Byte
 
 compressRLE  :: IO Stream -> IO Stream 
-compressRLE s = return . (\s -> rle (nextSymbol s) s  Nothing) =<< s
+compressRLE = fmap (flip (nextSymbol >>= rle) Nothing)
     where
         maxB = maxBound :: Byte
         rle             :: Byte -> Stream -> Maybe Byte -> Stream
@@ -39,8 +38,10 @@ compressRLE s = return . (\s -> rle (nextSymbol s) s  Nothing) =<< s
                   xs = L.tail s
 
 extractRLE  :: IO Stream -> IO Stream 
-extractRLE s = return . (\s -> rle (nextSymbol s)  s) =<< s
-    where rle p s
+extractRLE = fmap (nextSymbol >>= rle)
+    where
+      rle :: Byte -> Stream -> Stream
+      rle p s
             | L.null s  = L.empty
             | p == x    = let counter = L.head xs
                               next    = L.tail xs

@@ -1,10 +1,10 @@
 module Optparse
 ( archiverOpts
 , Options(..)
-, Method(..))
+)
 where
 
-import Compression (Method(..))
+import Compression
 import System.Console.GetOpt
 import System.FilePath((<.>))
 
@@ -13,15 +13,15 @@ data Options = Options
     , optCompress :: Bool
     , optExtract  :: Bool
     , optOutput   :: Maybe FilePath
-    , optMethod   :: Method
-    } deriving(Show, Eq)
+    , optAlgorithm :: CompressionAlgorithm
+    }
 
 defaultOptions :: Options
 defaultOptions = Options
     { optHelp      = False
     , optCompress  = False
     , optExtract   = False
-    , optMethod    = RLE
+    , optAlgorithm = rleAlg
     , optOutput    = Nothing
     }
 
@@ -36,9 +36,9 @@ options =
     , Option ['o'] ["output"]
         (OptArg (\ f o -> o { optOutput = f }) "FILE") "set output file"
     , Option ['r'] ["RLE"]
-        (NoArg  (\ o -> o { optMethod = RLE })) "use RLE algorithm (default)"
+        (NoArg  (\ o -> o { optAlgorithm = rleAlg })) "use RLE algorithm (default)"
     , Option ['H'] ["Huffman"]
-        (NoArg  (\ o -> o { optMethod = Huffman })) "use Huffman algorithm" 
+        (NoArg  (\ o -> o { optAlgorithm = huffmanAlg })) "use Huffman algorithm"
     ]
 
 helpMsg :: String

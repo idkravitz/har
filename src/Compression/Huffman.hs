@@ -1,6 +1,6 @@
 module Compression.Huffman
 (
-CompressionHuff(..)
+  huffmanAlg
 ) where
 
 import Control.Monad
@@ -13,15 +13,14 @@ import Data.Array
 import Data.Array.MArray
 import Data.Array.IO
 import Data.List
-import ArchiveCommon(Stream, Byte)
 import Compression.Base
 
-data CompressionHuff = CompressionHuff
-  deriving (Show)
+huffmanAlg :: CompressionAlgorithm
+huffmanAlg = CompAlg {
+  caCompress = compressHuffman,
+  caExtract  = extractHuffman
+}
 
-instance Compressor CompressionHuff where
-  compress _ = compressHuffman
-  extract _ = extractHuffman
 
 data Tree = Leaf Int Byte | Branch Int Tree Tree deriving(Show)
 data Bit = Zero | One deriving(Eq, Show)

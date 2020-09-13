@@ -13,7 +13,7 @@ main = do
                         putStrLn $ ioeGetErrorString err
                         exitWith $ ExitFailure 1
     let in_file  = head nopts
-        out_file = fromMaybe "" . optOutput $ opts 
-        func     = if optCompress opts then compress else extract
-        method   = optMethod opts
-    func method (L.readFile in_file) >>= L.writeFile out_file
+        out_file = fromMaybe "" . optOutput $ opts
+        cAlg     = optAlgorithm opts
+        func     = if optCompress opts then caCompress cAlg else caExtract cAlg
+    func (L.readFile in_file) >>= L.writeFile out_file
