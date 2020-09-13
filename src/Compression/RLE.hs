@@ -1,3 +1,4 @@
+{-# LANGUAGE ViewPatterns #-}
 module Compression.RLE
 (
   rleAlg
@@ -8,8 +9,8 @@ import qualified Data.ByteString.Lazy as L
 
 rleAlg :: CompressionAlgorithm
 rleAlg = CompAlg {
-  caCompress = compressRLE,
-  caExtract  = extractRLE
+  caCompress = compressM,
+  caExtract  = extractM
 }
 
 
@@ -18,8 +19,12 @@ nextSymbol   :: Stream -> Byte
 nextSymbol s = (L.head s + 1) `rem` maxB
     where maxB = maxBound::Byte
 
-compressRLE  :: IO Stream -> IO Stream 
-compressRLE = fmap (flip (nextSymbol >>= rle) Nothing)
+compressM, extractM :: (Monad m) => m Stream -> m Stream
+compressM = fmap compressRLE
+extractM = fmap extractRLE
+
+compressRLE  :: Stream -> Stream
+compressRLE = flip (nextSymbol >>= rle) Nothing
     where
         maxB = maxBound :: Byte
         rle             :: Byte -> Stream -> Maybe Byte -> Stream
@@ -37,18 +42,9 @@ compressRLE = fmap (flip (nextSymbol >>= rle) Nothing)
             where x  = L.head s
                   xs = L.tail s
 
-extractRLE  :: IO Stream -> IO Stream 
-extractRLE = fmap (nextSymbol >>= rle)
-    where
-      rle :: Byte -> Stream -> Stream
-      rle p s
-            | L.null s  = L.empty
-            | p == x    = let counter = L.head xs
-                              next    = L.tail xs
-                          in
-                          foldl (flip L.cons) (rle (nextSymbol next) next)
-                              $ replicate (fromIntegral counter + 1) x
-            | otherwise = x `L.cons` rle x xs
-            where x  = L.head s
-                  xs = L.tail s
-
+extractRLE  :: Stream -> Stream
+extractRLE (L.uncons -> Nothing) = L.empty
+extractRLE (L.uncons -> Just (x, nxt@(L.uncons -> Just (y, L.uncons -> Just (c, xs)))))
+  | x == y    = L.replicate (fromIntegral c + 2) x <> extractRLE xs -- count starts from 0 after at least 2 repeatables
+  | otherwise = x `L.cons` extractRLE nxt
+extractRLE s = s -- copy as-is
