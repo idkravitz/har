@@ -1,0 +1,6 @@
+dist-newstyle/
+.stack-work/
+tmp/
+
+har.cabal
+stack.yaml.lock

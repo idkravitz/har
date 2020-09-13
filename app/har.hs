@@ -1,5 +1,6 @@
 -- * The Haskell Archiver * --
 
+import Control.Exception
 import System.Environment
 import System.Exit
 import System.IO.Error
