@@ -4,12 +4,9 @@ module Optparse
 , Method(..))
 where
 
-import System.Environment
+import Compression (Method(..))
 import System.Console.GetOpt
 import System.FilePath((<.>))
-import Data.Maybe(fromMaybe)
-
-data Method = RLE | Huffman deriving(Show, Eq)
 
 data Options = Options
     { optHelp     :: Bool
@@ -19,6 +16,7 @@ data Options = Options
     , optMethod   :: Method
     } deriving(Show, Eq)
 
+defaultOptions :: Options
 defaultOptions = Options
     { optHelp      = False
     , optCompress  = False
@@ -27,6 +25,7 @@ defaultOptions = Options
     , optOutput    = Nothing
     }
 
+options :: [OptDescr (Options -> Options)]
 options =
     [ Option ['h'] ["help"]
         (NoArg  (\ o -> o { optHelp = True })) "print help message"
@@ -42,24 +41,28 @@ options =
         (NoArg  (\ o -> o { optMethod = Huffman })) "use Huffman algorithm" 
     ]
 
+helpMsg :: String
 helpMsg = usageInfo header options
     where header = "Usage: har [OPTION...] file"
 
+fixOutput :: (Options, [FilePath]) -> (Options, [FilePath])
 fixOutput (opts, nopts) = (opts { optOutput = Just . outputFileName $ optOutput opts }, nopts)
     where outputFileName Nothing = head nopts <.> ".har"
           outputFileName (Just f) = f
 
+-- TODO: This func is unreadable mess, refactoring needed
+-- TODO: It should be any instance of Except, IO is redundant here
 archiverOpts :: [String] -> IO (Options, [String])
 archiverOpts argv =
     case getOpt Permute options argv of
         (o, n, []  ) ->
             do
                 let opts = (foldl (flip id) defaultOptions o, n)
-                    checkOptions o@(opts, nopts)
-                        | optHelp opts || null nopts = fail helpMsg
-                        | optCompress opts == optExtract opts =
+                    checkOptions o'@(opts', nopts)
+                        | optHelp opts' || null nopts = fail helpMsg
+                        | optCompress opts' == optExtract opts' =
                             fail $ "Compress or extract must be set alone\n" ++ helpMsg
-                        | otherwise = return (fixOutput o)
+                        | otherwise = return (fixOutput o')
                 checkOptions opts
         (_, _, errs) -> fail $ concat errs ++ helpMsg
 

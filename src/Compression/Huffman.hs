@@ -1,10 +1,9 @@
-module Huffman
-( compressHuffman
-, extractHuffman
+module Compression.Huffman
+(
+CompressionHuff(..)
 ) where
 
 import Control.Monad
-import Control.Applicative
 import qualified Data.ByteString.Lazy as L
 import Data.Bits(setBit, testBit)
 import Data.Int(Int64)
@@ -15,6 +14,14 @@ import Data.Array.MArray
 import Data.Array.IO
 import Data.List
 import ArchiveCommon(Stream, Byte)
+import Compression.Base
+
+data CompressionHuff = CompressionHuff
+  deriving (Show)
+
+instance Compressor CompressionHuff where
+  compress _ = compressHuffman
+  extract _ = extractHuffman
 
 data Tree = Leaf Int Byte | Branch Int Tree Tree deriving(Show)
 data Bit = Zero | One deriving(Eq, Show)

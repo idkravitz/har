@@ -1,23 +1,13 @@
--- * The Haskell Archiver * --
-
 import Control.Exception
 import System.Environment
 import System.Exit
 import System.IO.Error
 import Optparse
 import Data.Maybe(fromMaybe)
-import RLE(compressRLE, extractRLE)
-import Huffman(compressHuffman, extractHuffman)
-import ArchiveCommon(Stream, Byte)
+import Compression
 import qualified Data.ByteString.Lazy as L
 
-compress         :: Method -> IO Stream -> IO Stream
-extract          :: Method -> IO Stream -> IO Stream
-compress RLE     = compressRLE
-compress Huffman = compressHuffman
-extract  RLE     = extractRLE
-extract  Huffman = extractHuffman
-
+main :: IO ()
 main = do
     (opts, nopts) <- catch (getArgs >>= archiverOpts) $ \ err -> do
                         putStrLn $ ioeGetErrorString err

@@ -1,11 +1,19 @@
-module RLE
-( compressRLE
-, extractRLE
+module Compression.RLE
+(
+CompressionRLE(..)
 ) where
 
 import ArchiveCommon(Stream, Byte)
 import qualified Data.ByteString.Lazy as L
-import Data.Word
+import Compression.Base
+
+data CompressionRLE = CompressionRLE
+  deriving (Show)
+
+instance Compressor CompressionRLE where
+  compress _ = compressRLE
+  extract _ = extractRLE
+
 
 nextSymbol   :: Stream -> Byte
 nextSymbol s = (L.head s + 1) `rem` maxB
