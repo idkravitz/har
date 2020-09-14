@@ -35,7 +35,7 @@ instance Arbitrary ArbRandByteString where
 
 spec :: Spec
 spec = do
-  describe "Message isomorphism" $ do
+  modifyMaxSuccess (const 1000) $ describe "Message isomorphism" $ do
     it "compresses empty to empty" $
       compress (pure L.empty) `shouldReturn` L.empty
     it "extracts empty to empty" $
@@ -48,3 +48,6 @@ spec = do
       property $ \(ArbByteStringRepChunks s) -> extract (compress (pure s)) `shouldReturn` s
     it "has isomorphic property on randomly random ByteString" $
       property $ \(ArbRandByteString s) -> extract (compress (pure s)) `shouldReturn` s
+    it "shouldn't break on byte boundary" $ do
+      let s = L.replicate 258 0
+      extract (compress (pure s)) `shouldReturn` s
