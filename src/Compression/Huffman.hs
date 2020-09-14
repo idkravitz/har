@@ -41,6 +41,7 @@ instance Binary.Binary Tree where
                   1 -> liftM3 Branch Binary.get Binary.get Binary.get
                   _ -> error "Tree is corrupted"
 
+getCount :: Tree -> Int
 getCount (Leaf c _)     = c
 getCount (Branch c _ _) = c
 
@@ -57,12 +58,13 @@ countBytes s = do
 
 -- obtains a pair of smallest node and the rest, that
 -- are greater
-getTree        :: [Tree] -> (Tree, [Tree])
-getTree (t:ts) = work t [] ts
+getTree        :: [Tree] -> Maybe (Tree, [Tree])
+getTree (t:ts) = pure $ work t [] ts
     where work x xs []                  = (x, xs)
           work x xs (y:ys)
               | getCount y < getCount x = work y (x:xs) ys
               | otherwise               = work x (y:xs) ys
+getTree [] = Nothing
 
 type CodeBook = Array Byte Bits
 
@@ -107,25 +109,34 @@ decode t s = bitDecode t . streamToBits $ s
           bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
 
 -- create tree from statistics list (pairs of (byte, count))
-buildTree :: [(Byte, Int)] -> Tree
-buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (b, c) -> c /= 0)
-    where build [t] = t -- its leaf
-          build ts  =
-                    let (t0, ts0) = getTree ts  -- first smallest and rest that greater
-                        (t1, ts1) = getTree ts0 -- second smallest and rest that greater
-                    in build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
+buildTree :: [(Byte, Int)] -> Maybe Tree
+buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (_, c) -> c /= 0)
+    where
+      build []  = Nothing
+      build [t] = pure t -- its leaf
+      build ts  = do
+        (t0, ts0) <- getTree ts  -- first smallest and rest that greater
+        (t1, ts1) <- getTree ts0 -- second smallest and rest that greater
+        build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
+-- TODO: Two passes through input should be enough, but here it does it trice
 compressHuffman           :: IO Stream -> IO Stream
 compressHuffman makeInput = do
     len  <- (return $!). L.length =<< makeInput
-    t    <- (return $!). buildTree =<< countBytes  =<< makeInput
-    code <- return . encode (createCodebook t) =<< makeInput 
-    return $ Binary.encode (t, len) `L.append` code
+    mayTree <- (return $!). buildTree =<< countBytes  =<< makeInput
+    if not (null mayTree) then do -- HACK !!!
+      let Just t = mayTree
+      code <- encode (createCodebook t) <$> makeInput
+      return $ Binary.encode (t, len) `L.append` code
+    else return L.empty
 
 deserialize :: Get (Tree, Int64, Stream)
 deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
 
 extractHuffman   :: IO Stream -> IO Stream
-extractHuffman s = do
-    (t, l, bs) <- return . runGet deserialize =<< s
+extractHuffman inAction = do
+  stream <- inAction
+  if not (L.null stream) then do -- HACK !!!
+    let (t, l, bs) = runGet deserialize stream
     return . L.take l . decode t $ bs
+  else return L.empty

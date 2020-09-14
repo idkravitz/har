@@ -6,6 +6,7 @@ import Test.Hspec.QuickCheck
 import Test.QuickCheck
 import Compression
 import Data.ByteString.Lazy as L
+import ArbInstances
 
 oneByte :: ByteString
 oneByte = L.pack [42]
@@ -16,22 +17,6 @@ thousandSameBytes = L.replicate 1000 42
 compress = caCompress rleAlg
 extract = caExtract rleAlg
 
-newtype ArbByteStringRepChunks = ArbByteStringRepChunks { unArbByteStringRepChunks :: ByteString }
-  deriving (Show)
-
-newtype ArbRandByteString = ArbRandByteString { unArbRandByteString :: ByteString }
-  deriving (Show)
-
-instance Arbitrary ArbByteStringRepChunks where
-  arbitrary = do
-    chunksCount <- choose (0, 100)
-    chunks <- replicateM chunksCount ((,) <$> arbitrary <*> choose (1, 100))
-    return $ ArbByteStringRepChunks $ foldMap (\(b, c) -> L.replicate c b) chunks
-
-instance Arbitrary ArbRandByteString where
-  arbitrary = do
-    len <- choose (0, 1000)
-    (ArbRandByteString . L.pack) <$> replicateM len arbitrary
 
 spec :: Spec
 spec = do
