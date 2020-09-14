@@ -20,33 +20,23 @@ pattern Empty <- (L.uncons -> Nothing)
 pattern (:>) :: Byte -> Stream -> Stream
 pattern x :> xs <- (L.uncons -> Just (x, xs))
 
--- TODO: What the fuck is this shit?!
-nextSymbol   :: Stream -> Byte
-nextSymbol s = (L.head s + 1) `rem` maxB
-    where maxB = maxBound::Byte
-
 compressM, extractM :: (Monad m) => m Stream -> m Stream
 compressM = fmap compressRLE
 extractM = fmap extractRLE
 
-compressRLE  :: Stream -> Stream
-compressRLE = flip (nextSymbol >>= rle) Nothing
-    where
-        maxB = maxBound :: Byte
-        rle             :: Byte -> Stream -> Maybe Byte -> Stream
-        rle p s Nothing
-            | L.null s  = L.empty
-            | p == x    = rle x xs (Just 0)
-            | otherwise = x `L.cons` rle x xs Nothing
-            where x  = L.head s
-                  xs = L.tail s
-        rle p s (Just c)
-            | L.null s  = p `L.cons` L.singleton c
-            | c == maxB = p `L.cons` (c `L.cons` rle (nextSymbol s) s Nothing)
-            | p == x    = rle x xs (Just $ c + 1)
-            | otherwise = p `L.cons` (c `L.cons` rle p s Nothing)
-            where x  = L.head s
-                  xs = L.tail s
+-- The algorithmic part start here
+
+compressRLE :: Stream -> Stream
+compressRLE stream = let
+  groups = L.group stream
+  f orig@(x :> _) = let
+    total = L.length orig
+    (n, r) = total `divMod` 257 -- maxBound :: Byte + 2
+    remain | r < 2     = replicate (fromIntegral r) x
+           | otherwise = [x, x, fromIntegral $ r - 2]
+    in L.pack $ mconcat (remain : replicate (fromIntegral n) [x, x, maxBound])
+  f _ = error "Impossible due to def of L.group"
+  in foldMap f groups
 
 extractRLE  :: Stream -> Stream
 extractRLE Empty = L.empty
