@@ -1,4 +1,6 @@
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE PatternSynonyms #-}
+
 module Compression.RLE
 (
   rleAlg
@@ -13,6 +15,10 @@ rleAlg = CompAlg {
   caExtract  = extractM
 }
 
+pattern Empty :: Stream
+pattern Empty <- (L.uncons -> Nothing)
+pattern (:>) :: Byte -> Stream -> Stream
+pattern x :> xs <- (L.uncons -> Just (x, xs))
 
 -- TODO: What the fuck is this shit?!
 nextSymbol   :: Stream -> Byte
@@ -43,8 +49,8 @@ compressRLE = flip (nextSymbol >>= rle) Nothing
                   xs = L.tail s
 
 extractRLE  :: Stream -> Stream
-extractRLE (L.uncons -> Nothing) = L.empty
-extractRLE (L.uncons -> Just (x, nxt@(L.uncons -> Just (y, L.uncons -> Just (c, xs)))))
+extractRLE Empty = L.empty
+extractRLE (x :> nxt@(y :> (c :> xs)))
   | x == y    = L.replicate (fromIntegral c + 2) x <> extractRLE xs -- count starts from 0 after at least 2 repeatables
   | otherwise = x `L.cons` extractRLE nxt
 extractRLE s = s -- copy as-is
