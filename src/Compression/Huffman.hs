@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 module Compression.Huffman
 (
   huffmanAlg
@@ -16,6 +17,7 @@ import Data.List
 import Compression.Base
 import LazyByteStringPatterns
 import Data.ByteString.Builder
+import GHC.Generics
 
 huffmanAlg :: CompressionAlgorithm
 huffmanAlg = CompAlg {
@@ -23,27 +25,15 @@ huffmanAlg = CompAlg {
   caExtract  = extractHuffman
 }
 
+data HuffTree = Leaf !Int !Byte
+              | Branch !Int HuffTree HuffTree
+              deriving (Show, Generic)
 
-data HuffTree = Leaf Int Byte
-              | Branch Int HuffTree HuffTree
-              deriving (Show)
+instance Binary.Binary HuffTree
+
 data Bit = Zero | One deriving (Show)
 type Bits = [Bit]
 
-instance Binary.Binary HuffTree where
-    put (Leaf count byte) = do Binary.put (0 :: Byte)
-                               Binary.put count
-                               Binary.put byte
-
-    put (Branch count t0 t1) = do Binary.put (1 :: Byte)
-                                  Binary.put count
-                                  Binary.put t0
-                                  Binary.put t1
-    get = do t <- Binary.get :: Binary.Get Byte
-             case t of
-                  0 -> liftM2 Leaf Binary.get Binary.get
-                  1 -> liftM3 Branch Binary.get Binary.get Binary.get
-                  _ -> error "HuffTree is corrupted"
 
 getCount :: HuffTree -> Int
 getCount (Leaf c _)     = c
@@ -131,8 +121,8 @@ buildHuffTree stats = build [Leaf c b | (b, c) <- stats, c > 0]
 -- TODO: Two passes through input should be enough, but here it does it trice
 compressHuffman           :: IO Stream -> IO Stream
 compressHuffman makeInput = do
-    len  <- (return $!). L.length =<< makeInput
-    mayHuffTree <- (return $!). buildHuffTree =<< countBytes  =<< makeInput
+    len  <- L.length <$> makeInput
+    mayHuffTree <- buildHuffTree <$> (countBytes  =<< makeInput)
     if not (null mayHuffTree) then do -- HACK !!!
       let Just t = mayHuffTree
       code <- encode (createCodebook t) <$> makeInput
