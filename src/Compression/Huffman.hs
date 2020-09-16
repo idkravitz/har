@@ -55,7 +55,7 @@ getCount (Branch c _ _) = c
 countBytes   :: Stream -> IO [(Byte, Int)]
 countBytes s = do
     arr <- counts
-    forM_ (L.unpack s) (\ b -> (+ 1) <$> readArray arr b >>= writeArray arr b)
+    forM_ (L.unpack s) (\ b -> succ <$> readArray arr b >>= writeArray arr b)
     getAssocs arr
     where counts = newArray (0, 255) 0 :: IO (IOUArray Byte Int)
 
@@ -111,16 +111,19 @@ decode t = bitDecode t . streamToBits
           -- on one-Leaf degenerate tree this one leads to infinite loop
           bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
 
+combineBranches :: HuffTree -> HuffTree -> HuffTree
+combineBranches b1 b2 = Branch (getCount b1 + getCount b2) b1 b2
+
 -- create tree from statistics list (pairs of (byte, count))
 buildHuffTree :: [(Byte, Int)] -> Maybe HuffTree
-buildHuffTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (_, c) -> c /= 0)
+buildHuffTree stats = build [Leaf c b | (b, c) <- stats, c > 0]
     where
       build []  = Nothing
-      build [t] = pure t -- its leaf
+      build [t] = pure t -- it's final tree
       build ts  = do
         (t0, ts0) <- getHuffTree ts  -- first smallest and rest that greater
         (t1, ts1) <- getHuffTree ts0 -- second smallest and rest that greater
-        build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
+        build $ combineBranches t0 t1 : ts1
 
 -- TODO: Two passes through input should be enough, but here it does it trice
 compressHuffman           :: IO Stream -> IO Stream
