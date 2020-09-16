@@ -19,6 +19,8 @@ spec = modifyMaxSuccess (const 1000) $ do
       compress (pure L.empty) `shouldReturn` L.empty
     it "extracts empty to empty" $
       extract (pure L.empty) `shouldReturn` L.empty
+    it "isomorphic on one byte" $
+      extract (compress (pure $ L.singleton 42)) `shouldReturn` L.singleton 42
     it "isomorphic on random ByteString" $
       property $ \(ArbRandByteString s) -> extract (compress (pure s)) `shouldReturn` s
     it "ismorphic on random chunked ByteString" $

@@ -22,11 +22,13 @@ huffmanAlg = CompAlg {
 }
 
 
-data Tree = Leaf Int Byte | Branch Int Tree Tree deriving(Show)
-data Bit = Zero | One deriving(Eq, Show)
+data HuffTree = Leaf Int Byte
+              | Branch Int HuffTree HuffTree
+              deriving (Show)
+data Bit = Zero | One deriving (Show)
 type Bits = [Bit]
 
-instance Binary.Binary Tree where
+instance Binary.Binary HuffTree where
     put (Leaf count byte) = do Binary.put (0 :: Byte)
                                Binary.put count
                                Binary.put byte
@@ -39,9 +41,9 @@ instance Binary.Binary Tree where
              case t of
                   0 -> liftM2 Leaf Binary.get Binary.get
                   1 -> liftM3 Branch Binary.get Binary.get Binary.get
-                  _ -> error "Tree is corrupted"
+                  _ -> error "HuffTree is corrupted"
 
-getCount :: Tree -> Int
+getCount :: HuffTree -> Int
 getCount (Leaf c _)     = c
 getCount (Branch c _ _) = c
 
@@ -58,17 +60,17 @@ countBytes s = do
 
 -- obtains a pair of smallest node and the rest, that
 -- are greater
-getTree        :: [Tree] -> Maybe (Tree, [Tree])
-getTree (t:ts) = pure $ work t [] ts
+getHuffTree        :: [HuffTree] -> Maybe (HuffTree, [HuffTree])
+getHuffTree (t:ts) = pure $ work t [] ts
     where work x xs []                  = (x, xs)
           work x xs (y:ys)
               | getCount y < getCount x = work y (x:xs) ys
               | otherwise               = work x (y:xs) ys
-getTree [] = Nothing
+getHuffTree [] = Nothing
 
 type CodeBook = Array Byte Bits
 
-createCodebook   :: Tree -> CodeBook
+createCodebook   :: HuffTree -> CodeBook
 createCodebook t = array (0, 255) (work [] t)
     where work bs (Leaf _ x)       = [(x, bs)]
           work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
@@ -83,8 +85,8 @@ bitsToStream bs = work 0 bs 7
     where work          :: Byte -> Bits ->Int -> Stream
           work a [] _   = L.singleton a
           work a (b:bs) i
-            | i == 0    = (if b == One then setBit a i else a) `L.cons` work 0 bs 7
-            | b == Zero = work a bs (i - 1)
+            | i == 0    = (case b of One -> setBit a i; _ -> a) `L.cons` work 0 bs 7
+            | Zero <- b = work a bs (i - 1)
             | otherwise = work (setBit a i) bs (i - 1)
 
 -- compression with specified codebook
@@ -100,37 +102,37 @@ streamToBits s
           getBit x = foldl' (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
 
 -- extraction with specified tree
-decode :: Tree -> Stream -> Stream
+decode :: HuffTree -> Stream -> Stream
 decode t s = bitDecode t . streamToBits $ s
-    where bitDecode :: Tree -> Bits -> Stream
+    where bitDecode :: HuffTree -> Bits -> Stream
           bitDecode (Branch _ t0 t1) (b:bs)
-              | b == Zero = bitDecode t0 bs
-              | b == One  = bitDecode t1 bs
+              | Zero <- b = bitDecode t0 bs
+              | One <- b  = bitDecode t1 bs
           bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
 
 -- create tree from statistics list (pairs of (byte, count))
-buildTree :: [(Byte, Int)] -> Maybe Tree
-buildTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (_, c) -> c /= 0)
+buildHuffTree :: [(Byte, Int)] -> Maybe HuffTree
+buildHuffTree = build . map (\ (b, c) -> Leaf c b) . filter (\ (_, c) -> c /= 0)
     where
       build []  = Nothing
       build [t] = pure t -- its leaf
       build ts  = do
-        (t0, ts0) <- getTree ts  -- first smallest and rest that greater
-        (t1, ts1) <- getTree ts0 -- second smallest and rest that greater
+        (t0, ts0) <- getHuffTree ts  -- first smallest and rest that greater
+        (t1, ts1) <- getHuffTree ts0 -- second smallest and rest that greater
         build $ Branch (getCount t0 + getCount t1) t0 t1 : ts1
 
 -- TODO: Two passes through input should be enough, but here it does it trice
 compressHuffman           :: IO Stream -> IO Stream
 compressHuffman makeInput = do
     len  <- (return $!). L.length =<< makeInput
-    mayTree <- (return $!). buildTree =<< countBytes  =<< makeInput
-    if not (null mayTree) then do -- HACK !!!
-      let Just t = mayTree
+    mayHuffTree <- (return $!). buildHuffTree =<< countBytes  =<< makeInput
+    if not (null mayHuffTree) then do -- HACK !!!
+      let Just t = mayHuffTree
       code <- encode (createCodebook t) <$> makeInput
       return $ Binary.encode (t, len) `L.append` code
     else return L.empty
 
-deserialize :: Get (Tree, Int64, Stream)
+deserialize :: Get (HuffTree, Int64, Stream)
 deserialize = liftM3 (,,) Binary.get Binary.get getRemainingLazyByteString
 
 extractHuffman   :: IO Stream -> IO Stream
