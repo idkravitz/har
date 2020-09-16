@@ -25,13 +25,12 @@ compactBound = 2 -- how many equal bytes are used to indicate RLE-compressed par
 compressRLE :: Stream -> Stream
 compressRLE stream = let
   groups = L.group stream
-  f orig@(x :> _) = let
+  f ~orig@(x :> _) = let
     total = L.length orig
     (n, r) = total `divMod` (fromIntegral (maxBound :: Byte) + compactBound)
     remain | r < compactBound = replicate (fromIntegral r) x
            | otherwise        = [x, x, fromIntegral $ r - compactBound]
     in L.pack $ mconcat (replicate (fromIntegral n) [x, x, maxBound]) ++ remain
-  f _ = error "Impossible due to def of L.group"
   in foldMap f groups
 
 extractRLE  :: Stream -> Stream
