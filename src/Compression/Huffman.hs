@@ -14,6 +14,7 @@ import Data.Array.MArray
 import Data.Array.IO
 import Data.List
 import Compression.Base
+import LazyByteStringPatterns
 
 huffmanAlg :: CompressionAlgorithm
 huffmanAlg = CompAlg {
@@ -76,12 +77,12 @@ createCodebook t = array (0, 255) (work [] t)
           work bs (Branch _ t0 t1) = work (bs ++ [Zero]) t0 ++ work (bs ++ [One]) t1
 
 encodedBits      :: CodeBook -> Stream -> Bits
-encodedBits cb s = concatMap (\b -> cb ! b) (L.unpack s)
+encodedBits cb s = concatMap (cb !) (L.unpack s)
 
 -- convert bit stream to byte stream
 bitsToStream    :: Bits -> Stream
 bitsToStream [] = L.empty
-bitsToStream bs = work 0 bs 7
+bitsToStream stream = work 0 stream 7
     where work          :: Byte -> Bits ->Int -> Stream
           work a [] _   = L.singleton a
           work a (b:bs) i
@@ -95,19 +96,19 @@ encode cb = bitsToStream . encodedBits cb
 
 -- convert byte stream to bit stream
 streamToBits :: Stream -> Bits
-streamToBits s
-    | L.null s  = []
-    | otherwise = getBit x ++ streamToBits xs
-    where (x, xs)  = (L.head s, L.tail s)
-          getBit x = foldl' (\ a i -> (if testBit x i then One else Zero) : a) [] [0..7]
+streamToBits (x :> xs) = getBits x ++ streamToBits xs where
+          getBits b = foldl' (\ a i -> (if testBit b i then One else Zero) : a) [] [0..7]
+streamToBits _ = []
 
 -- extraction with specified tree
 decode :: HuffTree -> Stream -> Stream
-decode t s = bitDecode t . streamToBits $ s
+decode t = bitDecode t . streamToBits
     where bitDecode :: HuffTree -> Bits -> Stream
           bitDecode (Branch _ t0 t1) (b:bs)
               | Zero <- b = bitDecode t0 bs
-              | One <- b  = bitDecode t1 bs
+              | One  <- b = bitDecode t1 bs
+          bitDecode Branch{}  [] = error "Corrupted archive"
+          -- on one-Leaf degenerate tree this one leads to infinite loop
           bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
 
 -- create tree from statistics list (pairs of (byte, count))

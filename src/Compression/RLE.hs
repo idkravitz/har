@@ -1,6 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE PatternSynonyms #-}
-
 module Compression.RLE
 (
   rleAlg
@@ -8,17 +5,13 @@ module Compression.RLE
 
 import Compression.Base
 import qualified Data.ByteString.Lazy as L
+import LazyByteStringPatterns
 
 rleAlg :: CompressionAlgorithm
 rleAlg = CompAlg {
   caCompress = compressM,
   caExtract  = extractM
 }
-
-pattern Empty :: Stream
-pattern Empty <- (L.uncons -> Nothing)
-pattern (:>) :: Byte -> Stream -> Stream
-pattern x :> xs <- (L.uncons -> Just (x, xs))
 
 compressM, extractM :: (Monad m) => m Stream -> m Stream
 compressM = fmap compressRLE
