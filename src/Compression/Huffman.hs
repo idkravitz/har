@@ -15,6 +15,7 @@ import Data.Array.IO
 import Data.List
 import Compression.Base
 import LazyByteStringPatterns
+import Data.ByteString.Builder
 
 huffmanAlg :: CompressionAlgorithm
 huffmanAlg = CompAlg {
@@ -82,11 +83,11 @@ encodedBits cb s = concatMap (cb !) (L.unpack s)
 -- convert bit stream to byte stream
 bitsToStream    :: Bits -> Stream
 bitsToStream [] = L.empty
-bitsToStream stream = work 0 stream 7
-    where work          :: Byte -> Bits ->Int -> Stream
-          work a [] _   = L.singleton a
+bitsToStream stream = toLazyByteString $ work 0 stream 7
+    where work          :: Byte -> Bits ->Int -> Builder
+          work a [] _   = word8 a
           work a (b:bs) i
-            | i == 0    = (case b of One -> setBit a i; _ -> a) `L.cons` work 0 bs 7
+            | i == 0    = word8 (case b of One -> setBit a i; _ -> a) <> work 0 bs 7
             | Zero <- b = work a bs (i - 1)
             | otherwise = work (setBit a i) bs (i - 1)
 
@@ -102,14 +103,16 @@ streamToBits _ = []
 
 -- extraction with specified tree
 decode :: HuffTree -> Stream -> Stream
-decode t = bitDecode t . streamToBits
-    where bitDecode :: HuffTree -> Bits -> Stream
+decode t = toLazyByteString . bitDecode t . streamToBits
+    where bitDecode :: HuffTree -> Bits -> Builder
           bitDecode (Branch _ t0 t1) (b:bs)
               | Zero <- b = bitDecode t0 bs
               | One  <- b = bitDecode t1 bs
-          bitDecode Branch{}  [] = error "Corrupted archive"
+          -- TODO: This should be an error signaling situation, but Builder is strict by chunk-size
+          -- meanwhile explicit counter var reduces performance by 30%
+          bitDecode Branch{}  [] = mempty--error "Corrupted archive"
           -- on one-Leaf degenerate tree this one leads to infinite loop
-          bitDecode (Leaf _ b) bs = b `L.cons` bitDecode t bs
+          bitDecode (Leaf _ b) bs = word8 b <> bitDecode t bs
 
 combineBranches :: HuffTree -> HuffTree -> HuffTree
 combineBranches b1 b2 = Branch (getCount b1 + getCount b2) b1 b2

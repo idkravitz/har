@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Compression.RLE
 (
   rleAlg
@@ -5,6 +6,7 @@ module Compression.RLE
 
 import Compression.Base
 import qualified Data.ByteString.Lazy as L
+import Data.ByteString.Builder
 import LazyByteStringPatterns
 
 rleAlg :: CompressionAlgorithm
@@ -27,16 +29,19 @@ compressRLE stream = let
   groups = L.group stream
   f ~orig@(x :> _) = let
     total = L.length orig
-    (n, r) = total `divMod` (fromIntegral (maxBound :: Byte) + compactBound)
+    (!n, !r) = total `divMod` (fromIntegral (maxBound :: Byte) + compactBound)
     remain | r < compactBound = replicate (fromIntegral r) x
            | otherwise        = [x, x, fromIntegral $ r - compactBound]
-    in L.pack $ mconcat (replicate (fromIntegral n) [x, x, maxBound]) ++ remain
-  in foldMap f groups
+    in mconcat (replicate (fromIntegral n) (lazyByteString (L.pack [x, x, maxBound])))
+       <> lazyByteString (L.pack remain)
+  in toLazyByteString $ foldMap f groups
 
-extractRLE  :: Stream -> Stream
-extractRLE Empty = L.empty
-extractRLE (x :> nxt@(y :> (c :> xs)))
- -- count starts from 0 after at least 2 repeatables
-  | x == y    = L.replicate (fromIntegral c + compactBound) x <> extractRLE xs
-  | otherwise = x `L.cons` extractRLE nxt
-extractRLE s = s -- copy as-is
+extractRLE :: Stream -> Stream
+extractRLE = toLazyByteString . helper where
+  helper  :: Stream -> Builder
+  helper Empty = mempty
+  helper (x :> nxt@(y :> (c :> xs)))
+  -- count starts from 0 after at least 2 repeatables
+    | x == y    = lazyByteString (L.replicate (fromIntegral c + compactBound) x) <> helper xs
+    | otherwise = word8 x <> helper nxt
+  helper s = lazyByteString s -- copy as-is
